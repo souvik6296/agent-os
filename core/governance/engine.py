@@ -20,10 +20,10 @@ class GovernanceDecision:
 
 class GovernanceEngine:
     """
-    Initial deterministic Governance Engine.
+    Deterministic Governance Engine.
 
-    The engine evaluates hard constitutional rules before
-    an agent is allowed to perform a governed action.
+    The engine evaluates constitutional and governance rules
+    before an agent is allowed to perform a governed action.
     """
 
     PROTECTED_RESOURCES = {
@@ -34,7 +34,18 @@ class GovernanceEngine:
         "audit_system",
     }
 
-    def evaluate(self, request: GovernanceRequest) -> GovernanceDecision:
+    HIERARCHY_CREATION_RULES = {
+        "owner": {"boss"},
+        "boss": {"manager"},
+        "manager": {"team", "worker"},
+        "team": {"worker"},
+        "worker": set(),
+    }
+
+    def evaluate(
+        self,
+        request: GovernanceRequest,
+    ) -> GovernanceDecision:
 
         # Article 5 — Constitutional Protection
         if request.resource in self.PROTECTED_RESOURCES:
@@ -46,7 +57,10 @@ class GovernanceEngine:
                 )
 
         # Permission Enforcement
-        if not request.context.get("permissions_satisfied", True):
+        if not request.context.get(
+            "permissions_satisfied",
+            True,
+        ):
             missing_permissions = request.context.get(
                 "missing_permissions",
                 [],
@@ -62,7 +76,42 @@ class GovernanceEngine:
             )
 
         # Article 2 — Hierarchy Authority
-        if request.context.get("exceeds_role_authority", False):
+        #
+        # Enforce the organization's allowed creation structure:
+        #
+        # Owner   → Boss
+        # Boss    → Manager
+        # Manager → Team / Worker
+        # Team    → Worker
+        # Worker  → Nothing
+        #
+        if (
+            request.action == "create_agent"
+            and request.resource == "agent"
+            and "target_role" in request.context
+        ):
+            target_role = request.context["target_role"]
+
+            allowed_roles = self.HIERARCHY_CREATION_RULES.get(
+                request.role,
+                set(),
+            )
+
+            if target_role not in allowed_roles:
+                return GovernanceDecision(
+                    decision="DENY",
+                    reason=(
+                        f"Role '{request.role}' cannot create "
+                        f"role '{target_role}'."
+                    ),
+                    policy="hierarchy_authority",
+                )
+
+        # Article 2 — Explicit Authority Override
+        if request.context.get(
+            "exceeds_role_authority",
+            False,
+        ):
             return GovernanceDecision(
                 decision="DENY",
                 reason="Agent exceeds its assigned authority.",
@@ -70,7 +119,10 @@ class GovernanceEngine:
             )
 
         # Article 6 — Least Authority
-        if request.context.get("exceeds_required_scope", False):
+        if request.context.get(
+            "exceeds_required_scope",
+            False,
+        ):
             return GovernanceDecision(
                 decision="DENY",
                 reason="Requested permission exceeds required scope.",
@@ -78,7 +130,10 @@ class GovernanceEngine:
             )
 
         # Article 12 — Resource Governance
-        if request.context.get("resource_limit_exceeded", False):
+        if request.context.get(
+            "resource_limit_exceeded",
+            False,
+        ):
             return GovernanceDecision(
                 decision="DENY",
                 reason="Configured resource limit exceeded.",
@@ -86,7 +141,10 @@ class GovernanceEngine:
             )
 
         # Article 13 — Security
-        if request.context.get("security_violation", False):
+        if request.context.get(
+            "security_violation",
+            False,
+        ):
             return GovernanceDecision(
                 decision="DENY",
                 reason="Security policy violation.",
@@ -94,24 +152,41 @@ class GovernanceEngine:
             )
 
         # Article 7 — Auditability
-        if request.context.get("requires_audit", False):
-            if not request.context.get("audit_available", False):
+        if request.context.get(
+            "requires_audit",
+            False,
+        ):
+            if not request.context.get(
+                "audit_available",
+                False,
+            ):
                 return GovernanceDecision(
                     decision="DENY",
-                    reason="Required audit mechanism is unavailable.",
+                    reason=(
+                        "Required audit mechanism is unavailable."
+                    ),
                     policy="audit_required",
                 )
 
         # Article 14 — Reversibility
-        if request.context.get("rollback_required", False):
-            if not request.context.get("rollback_available", False):
+        if request.context.get(
+            "rollback_required",
+            False,
+        ):
+            if not request.context.get(
+                "rollback_available",
+                False,
+            ):
                 return GovernanceDecision(
                     decision="DENY",
-                    reason="Required rollback mechanism is unavailable.",
+                    reason=(
+                        "Required rollback mechanism is unavailable."
+                    ),
                     policy="reversibility",
                 )
 
-        # If all mandatory rules pass, autonomous execution is allowed.
+        # If all mandatory rules pass,
+        # autonomous execution is allowed.
         return GovernanceDecision(
             decision="ALLOW",
             reason="All deterministic governance checks passed.",

@@ -93,6 +93,9 @@ class AgentService:
                 action="create_agent",
                 resource="agent",
                 requested_permissions=["AGENT_CREATE"],
+                context={
+                    "target_role": role,
+                },
             )
 
             if governance_result["decision"] != "ALLOW":
