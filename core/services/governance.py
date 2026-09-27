@@ -2,14 +2,18 @@ from typing import Any
 
 from core.governance.engine import GovernanceEngine, GovernanceRequest
 from core.repositories.governance import GovernanceRepository
+from core.repositories.permissions import PermissionRepository
 
 
 class GovernanceService:
     """
-    Coordinates governance evaluation and persistence.
+    Coordinates permission checks, governance evaluation, and persistence.
 
     Flow:
-        Request
+
+        Agent
+          ↓
+        Permission Check
           ↓
         Governance Engine
           ↓
@@ -22,9 +26,13 @@ class GovernanceService:
         self,
         engine: GovernanceEngine | None = None,
         repository: GovernanceRepository | None = None,
+        permission_repository: PermissionRepository | None = None,
     ):
         self.engine = engine or GovernanceEngine()
         self.repository = repository or GovernanceRepository()
+        self.permission_repository = (
+            permission_repository or PermissionRepository()
+        )
 
     def authorize(
         self,
@@ -36,19 +44,38 @@ class GovernanceService:
         requested_permissions: list[str] | None = None,
         context: dict[str, Any] | None = None,
     ):
-        request_context = context or {}
+        request_context = dict(context or {})
 
-        # 1. Persist the governance request.
+        required_permissions = requested_permissions or []
+
+        # 1. Check permissions against the persistent permission registry.
+        missing_permissions = [
+            permission
+            for permission in required_permissions
+            if not self.permission_repository.has_permission(
+                agent_id,
+                permission,
+            )
+        ]
+
+        permissions_satisfied = len(missing_permissions) == 0
+
+        # Pass permission state into the deterministic governance engine.
+        request_context["required_permissions"] = required_permissions
+        request_context["missing_permissions"] = missing_permissions
+        request_context["permissions_satisfied"] = permissions_satisfied
+
+        # 2. Persist the governance request.
         request_id = self.repository.create_request(
             agent_id=agent_id,
             task_id=task_id,
             action=action,
             resource=resource,
-            requested_permissions=requested_permissions,
+            requested_permissions=required_permissions,
             context=request_context,
         )
 
-        # 2. Build the request for the deterministic engine.
+        # 3. Build the request for the deterministic engine.
         governance_request = GovernanceRequest(
             agent_id=agent_id,
             role=role,
@@ -57,10 +84,10 @@ class GovernanceService:
             context=request_context,
         )
 
-        # 3. Evaluate constitutional rules.
+        # 4. Evaluate constitutional and governance rules.
         decision = self.engine.evaluate(governance_request)
 
-        # 4. Persist the decision.
+        # 5. Persist the governance decision.
         decision_id = self.repository.save_decision(
             request_id=request_id,
             decision=decision.decision,
@@ -68,7 +95,7 @@ class GovernanceService:
             reason=decision.reason,
         )
 
-        # 5. Always create an audit record.
+        # 6. Persist an audit record.
         audit_id = self.repository.create_audit_log(
             agent_id=agent_id,
             task_id=task_id,
@@ -77,8 +104,10 @@ class GovernanceService:
             resource=resource,
             result=decision.decision,
             details={
-                "policy": decision.policy,
                 "reason": decision.reason,
+                "policy": decision.policy,
+                "required_permissions": required_permissions,
+                "missing_permissions": missing_permissions,
             },
         )
 
@@ -89,4 +118,5 @@ class GovernanceService:
             "decision": decision.decision,
             "reason": decision.reason,
             "policy": decision.policy,
+            "missing_permissions": missing_permissions,
         }

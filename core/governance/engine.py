@@ -45,6 +45,22 @@ class GovernanceEngine:
                     policy="core_protection",
                 )
 
+        # Permission Enforcement
+        if not request.context.get("permissions_satisfied", True):
+            missing_permissions = request.context.get(
+                "missing_permissions",
+                [],
+            )
+
+            return GovernanceDecision(
+                decision="DENY",
+                reason=(
+                    "Required permission(s) missing: "
+                    + ", ".join(missing_permissions)
+                ),
+                policy="permission_required",
+            )
+
         # Article 2 — Hierarchy Authority
         if request.context.get("exceeds_role_authority", False):
             return GovernanceDecision(
