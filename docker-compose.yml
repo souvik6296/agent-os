@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: agent-os-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: agent_os
+      POSTGRES_USER: agent_os
+      POSTGRES_PASSWORD: agent_os_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - agent_os_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  agent_os_postgres_data:
