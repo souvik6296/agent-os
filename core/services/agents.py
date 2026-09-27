@@ -1,11 +1,12 @@
 from typing import Any
 
 from core.repositories.agents import AgentRepository
+from core.services.governance import GovernanceService
 
 
 class AgentService:
     """
-    Handles agent lifecycle operations above the persistence layer.
+    Handles governed agent lifecycle operations.
     """
 
     VALID_ROLES = {
@@ -19,13 +20,19 @@ class AgentService:
     def __init__(
         self,
         repository: AgentRepository | None = None,
+        governance_service: GovernanceService | None = None,
     ):
         self.repository = repository or AgentRepository()
+        self.governance_service = (
+            governance_service or GovernanceService()
+        )
 
     def create_agent(
         self,
         name: str,
         role: str,
+        creator_agent_id: str | None = None,
+        creator_role: str | None = None,
         parent_agent_id: str | None = None,
         model_provider: str | None = None,
         model_name: str | None = None,
@@ -46,6 +53,26 @@ class AgentService:
 
             if parent is None:
                 raise ValueError("Parent agent does not exist.")
+
+        # Agent creation is a governed operation.
+        if creator_agent_id is not None:
+            if creator_role is None:
+                raise ValueError(
+                    "Creator role is required when creator agent is provided."
+                )
+
+            governance_result = self.governance_service.authorize(
+                agent_id=creator_agent_id,
+                role=creator_role,
+                action="create_agent",
+                resource="agent",
+                requested_permissions=["AGENT_CREATE"],
+            )
+
+            if governance_result["decision"] != "ALLOW":
+                raise PermissionError(
+                    governance_result["reason"]
+                )
 
         return self.repository.create_agent(
             name=name,
