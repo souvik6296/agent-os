@@ -206,3 +206,6 @@ CREATE INDEX idx_tasks_status
 
 CREATE INDEX idx_tasks_parent
     ON tasks(parent_task_id);
+CREATE UNIQUE INDEX agents_single_owner_idx
+ON agents (role)
+WHERE role = 'owner';
