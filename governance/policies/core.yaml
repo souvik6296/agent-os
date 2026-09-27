@@ -1,0 +1,133 @@
+version: "0.1"
+
+policies:
+
+  - id: mission_scope
+    article: 1
+    description: "Agents may only act within objectives assigned by the Owner."
+    effect: deny
+    condition:
+      action_scope: unrelated_to_assigned_task
+
+  - id: hierarchy_authority
+    article: 2
+    description: "Agents may not exceed the authority granted by their role."
+    effect: deny
+    condition:
+      authority: exceeds_role_authority
+
+  - id: autonomous_action
+    article: 3
+    description: "Authorized agents may act autonomously without human approval."
+    effect: allow
+    condition:
+      governance_requirements: satisfied
+
+  - id: governance_required
+    article: 4
+    description: "Governed actions must pass the Governance Engine."
+    effect: deny
+    condition:
+      governance_evaluation: failed
+
+  - id: core_protection
+    article: 5
+    description: "Core constitutional and governance systems are protected."
+    effect: deny
+    condition:
+      target:
+        - constitution
+        - governance_engine
+        - root_identity
+        - root_permissions
+        - audit_system
+
+  - id: least_authority
+    article: 6
+    description: "Agents receive only the minimum authority required."
+    effect: deny
+    condition:
+      permission: exceeds_required_scope
+
+  - id: audit_required
+    article: 7
+    description: "Significant actions must create an audit record."
+    effect: deny
+    condition:
+      audit_record: missing
+
+  - id: capability_creation
+    article: 8
+    description: "Authorized agents may create new capabilities."
+    effect: allow
+    condition:
+      sandbox_test: passed
+      security_check: passed
+      permission_declaration: present
+      versioned: true
+      registered: true
+
+  - id: self_improvement
+    article: 9
+    description: "Authorized self-improvement must be tested, versioned and reversible."
+    effect: deny
+    condition:
+      tested: false
+      versioned: false
+      reversible: false
+
+  - id: resource_limits
+    article: 12
+    description: "Actions must remain within configured resource limits."
+    effect: deny
+    condition:
+      resource_limit: exceeded
+
+  - id: security_protection
+    article: 13
+    description: "Agents may not bypass mandatory security controls."
+    effect: deny
+    condition:
+      security_violation: true
+
+  - id: reversibility
+    article: 14
+    description: "Autonomous changes should be reversible where technically possible."
+    effect: deny
+    condition:
+      rollback_required: true
+      rollback_available: false
+
+  - id: human_authority
+    article: 16
+    description: "The Owner retains ultimate authority and emergency override."
+    effect: allow
+    condition:
+      actor: owner
+
+  - id: ambiguity_protection
+    article: 17
+    description: "Ambiguous actions must prefer safety, least authority and minimal irreversible consequences."
+    effect: deny
+    condition:
+      interpretation: ambiguous
+      irreversible_consequence: true
+
+  - id: constitutional_protection
+    article: 18
+    description: "The active Constitution cannot be directly modified by ordinary agents."
+    effect: deny
+    condition:
+      actor_role:
+        - worker
+        - manager
+        - boss
+        - generated_capability
+
+  - id: audit_integrity
+    article: 19
+    description: "Governance decisions and significant actions must remain auditable."
+    effect: deny
+    condition:
+      audit_integrity: compromised
+
