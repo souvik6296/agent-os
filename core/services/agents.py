@@ -27,6 +27,32 @@ class AgentService:
             governance_service or GovernanceService()
         )
 
+    def bootstrap_owner(
+        self,
+        name: str,
+        model_provider: str | None = None,
+        model_name: str | None = None,
+        system_prompt: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> str:
+        if not name.strip():
+            raise ValueError("Agent name cannot be empty.")
+
+        existing_owner = self.repository.get_owner()
+
+        if existing_owner is not None:
+            raise ValueError("Owner agent already exists.")
+
+        return self.repository.create_agent(
+            name=name,
+            role="owner",
+            parent_agent_id=None,
+            model_provider=model_provider,
+            model_name=model_name,
+            system_prompt=system_prompt,
+            metadata=metadata,
+        )
+
     def create_agent(
         self,
         name: str,

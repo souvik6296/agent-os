@@ -84,6 +84,37 @@ class AgentRepository:
                 columns = [description.name for description in cursor.description]
 
                 return dict(zip(columns, row))
+    def get_owner(self) -> dict[str, Any] | None:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        id,
+                        name,
+                        role,
+                        parent_agent_id,
+                        status,
+                        model_provider,
+                        model_name,
+                        system_prompt,
+                        metadata,
+                        created_at,
+                        updated_at
+                    FROM agents
+                    WHERE role = 'owner'
+                    LIMIT 1;
+                    """
+                )
+
+                row = cursor.fetchone()
+
+                if row is None:
+                    return None
+
+                columns = [description.name for description in cursor.description]
+
+                return dict(zip(columns, row))
 
     def update_status(
         self,

@@ -2,8 +2,8 @@ import pytest
 
 from core.database.connection import get_connection
 from core.repositories.agents import AgentRepository
-from core.services.agents import AgentService
 from core.repositories.permissions import PermissionRepository
+from core.services.agents import AgentService
 
 
 def test_agent_service_creates_valid_agent():
@@ -88,6 +88,7 @@ def test_agent_service_rejects_missing_parent():
             role="worker",
             parent_agent_id=missing_parent_id,
         )
+
 
 def test_agent_service_denies_creation_without_permission():
     service = AgentService()
@@ -202,7 +203,7 @@ def test_agent_service_allows_creation_with_permission():
                         SELECT id
                         FROM governance_requests
                         WHERE agent_id = %s
-			);
+                    );
                     """,
                     (creator_id,),
                 )
@@ -226,3 +227,60 @@ def test_agent_service_allows_creation_with_permission():
             connection.commit()
 
         service.repository.delete_agent(creator_id)
+
+
+def test_agent_service_bootstraps_owner():
+    service = AgentService()
+
+    owner_id = service.bootstrap_owner(
+        name="root-owner",
+        model_provider="ollama",
+        model_name="qwen3:8b",
+        system_prompt="You are the root owner.",
+    )
+
+    try:
+        owner = service.repository.get_owner()
+
+        assert owner is not None
+        assert str(owner["id"]) == owner_id
+        assert owner["name"] == "root-owner"
+        assert owner["role"] == "owner"
+        assert owner["parent_agent_id"] is None
+        assert owner["model_provider"] == "ollama"
+        assert owner["model_name"] == "qwen3:8b"
+
+    finally:
+        service.repository.delete_agent(owner_id)
+
+
+def test_agent_service_rejects_second_owner():
+    service = AgentService()
+
+    first_owner_id = service.bootstrap_owner(
+        name="first-owner",
+    )
+
+    try:
+        with pytest.raises(
+            ValueError,
+            match="Owner agent already exists",
+        ):
+            service.bootstrap_owner(
+                name="second-owner",
+            )
+
+    finally:
+        service.repository.delete_agent(first_owner_id)
+
+
+def test_agent_service_rejects_empty_owner_name():
+    service = AgentService()
+
+    with pytest.raises(
+        ValueError,
+        match="Agent name cannot be empty",
+    ):
+        service.bootstrap_owner(
+            name="   ",
+        )
